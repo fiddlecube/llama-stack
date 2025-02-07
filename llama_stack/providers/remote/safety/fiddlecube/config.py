@@ -11,4 +11,5 @@ from llama_models.schema_utils import json_schema_type
 
 @json_schema_type
 class FiddlecubeSafetyConfig(BaseModel):
+    api_url: str = "http://localhost:8000/api"
     pass

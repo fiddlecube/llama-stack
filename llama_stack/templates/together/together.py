@@ -28,7 +28,7 @@ def get_distribution_template() -> DistributionTemplate:
     providers = {
         "inference": ["remote::together"],
         "vector_io": ["inline::faiss", "remote::chromadb", "remote::pgvector"],
-        "safety": ["inline::llama-guard"],
+        "safety": ["inline::llama-guard", "remote::fiddlecube"],
         "agents": ["inline::meta-reference"],
         "telemetry": ["inline::meta-reference"],
         "eval": ["inline::meta-reference"],
@@ -103,7 +103,7 @@ def get_distribution_template() -> DistributionTemplate:
             "run.yaml": RunConfigSettings(
                 provider_overrides={
                     "inference": [inference_provider, embedding_provider],
-                    "vector_io": [vector_io_provider],
+                    "vector_io": [vector_io_provider]
                 },
                 default_models=default_models + [embedding_model],
                 default_tool_groups=default_tool_groups,

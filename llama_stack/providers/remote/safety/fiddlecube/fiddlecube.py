@@ -6,6 +6,7 @@
 
 import json
 import logging
+import httpx
 
 from typing import Any, Dict, List
 
@@ -38,59 +39,41 @@ class FiddlecubeSafetyAdapter(Safety, ShieldsProtocolPrivate):
         pass
 
     async def register_shield(self, shield: Shield) -> None:
+        print("Shield", shield)
         pass
 
     async def run_shield(
         self, shield_id: str, messages: List[Message], params: Dict[str, Any] = None
     ) -> RunShieldResponse:
-        # Set up FiddleCube API using httpx
-        # [TBD] convert the `messages` into format FiddleCube expects
-        # make a call to the API for guardrails
-        # convert the [TBD] response into the format RunShieldResponse expects
-        # return the response
-        return RunShieldResponse()
-
-        shield = await self.shield_store.get_shield(shield_id)
-        if not shield:
-            raise ValueError(f"Shield {shield_id} not found")
-
-        """This is the implementation for the bedrock guardrails. The input to the guardrails is to be of this format
-        ```content = [
-            {
-                "text": {
-                    "text": "Is the AB503 Product a better investment than the S&P 500?"
-                }
-            }
-        ]```
-        However the incoming messages are of this type UserMessage(content=....) coming from
-        https://github.com/meta-llama/llama-models/blob/main/models/llama3/api/datatypes.py
-
-        They contain content, role . For now we will extract the content and default the "qualifiers": ["query"]
-        """
-
-        shield_params = shield.params
-        logger.debug(f"run_shield::{shield_params}::messages={messages}")
-
-        # - convert the messages into format Bedrock expects
-        content_messages = []
-        for message in messages:
-            content_messages.append({"text": {"text": message.content}})
+        # Convert the `messages` into the format FiddleCube expects
+        content_messages = [{"text": {"text": message.content}} for message in messages]
         logger.debug(f"run_shield::final:messages::{json.dumps(content_messages, indent=2)}:")
+        print("URL::::", self.config.api_url)
+        # Make a call to the FiddleCube API for guardrails
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                self.config.api_url + '/safety/redteam/benchmark',
+                json={
+                    "model_name": "gpt-4o",
+                    "system_prompt": content_messages,
+                }
+            )
 
-        response = self.bedrock_runtime_client.apply_guardrail(
-            guardrailIdentifier=shield.provider_resource_id,
-            guardrailVersion=shield_params["guardrailVersion"],
-            source="OUTPUT",  # or 'INPUT' depending on your use case
-            content=content_messages,
-        )
-        if response["action"] == "GUARDRAIL_INTERVENED":
+            print("Response:::", response)
+
+        # Check if the response is successful
+        if response.status_code != 200:
+            logger.error(f"FiddleCube API error: {response.status_code} - {response.text}")
+            raise RuntimeError("Failed to run shield with FiddleCube API")
+
+        # Convert the response into the format RunShieldResponse expects
+        response_data = response.json()
+        if response_data["action"] == "GUARDRAIL_INTERVENED":
             user_message = ""
             metadata = {}
-            for output in response["outputs"]:
-                # guardrails returns a list - however for this implementation we will leverage the last values
+            for output in response_data["outputs"]:
                 user_message = output["text"]
-            for assessment in response["assessments"]:
-                # guardrails returns a list - however for this implementation we will leverage the last values
+            for assessment in response_data["assessments"]:
                 metadata = dict(assessment)
 
             return RunShieldResponse(
