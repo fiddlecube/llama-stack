@@ -50,38 +50,21 @@ class FiddlecubeSafetyAdapter(Safety, ShieldsProtocolPrivate):
         logger.debug(f"run_shield::final:messages::{json.dumps(content_messages, indent=2)}:")
         print("URL::::", self.config.api_url)
         # Make a call to the FiddleCube API for guardrails
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
-                self.config.api_url + '/safety/redteam/benchmark',
-                json={
-                    "model_name": "gpt-4o",
-                    "system_prompt": content_messages,
-                }
-            )
+                self.config.api_url + '/safety/redteam/benchmark?model_name=gpt-4o &system_prompt=what%20is%20the%20red%20color%20on%20your%20face'
+                )
 
-            print("Response:::", response)
+            print("Response:::", response.status_code)
 
         # Check if the response is successful
         if response.status_code != 200:
-            logger.error(f"FiddleCube API error: {response.status_code} - {response.text}")
+            print(f"FiddleCube API error: {response.status_code} - {response.text}")
             raise RuntimeError("Failed to run shield with FiddleCube API")
 
         # Convert the response into the format RunShieldResponse expects
         response_data = response.json()
-        if response_data["action"] == "GUARDRAIL_INTERVENED":
-            user_message = ""
-            metadata = {}
-            for output in response_data["outputs"]:
-                user_message = output["text"]
-            for assessment in response_data["assessments"]:
-                metadata = dict(assessment)
+        print("Response data", response_data)
 
-            return RunShieldResponse(
-                violation=SafetyViolation(
-                    user_message=user_message,
-                    violation_level=ViolationLevel.ERROR,
-                    metadata=metadata,
-                )
-            )
 
         return RunShieldResponse()
