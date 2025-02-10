@@ -15,8 +15,6 @@ from llama_stack.apis.inference import Message
 from llama_stack.apis.safety import (
     RunShieldResponse,
     Safety,
-    SafetyViolation,
-    ViolationLevel,
 )
 from llama_stack.apis.shields import Shield
 from llama_stack.providers.datatypes import ShieldsProtocolPrivate
@@ -48,23 +46,30 @@ class FiddlecubeSafetyAdapter(Safety, ShieldsProtocolPrivate):
         # Convert the `messages` into the format FiddleCube expects
         content_messages = [{"text": {"text": message.content}} for message in messages]
         logger.debug(f"run_shield::final:messages::{json.dumps(content_messages, indent=2)}:")
-        print("URL::::", self.config.api_url)
+
         # Make a call to the FiddleCube API for guardrails
         async with httpx.AsyncClient(timeout=30.0) as client:
+            request_body = {
+                "messages": [message.model_dump(mode="json") for message in messages],
+            }
+            if params.get("excluded_categories"):
+                request_body["excluded_categories"] = params.get("excluded_categories")
+            headers = {"Content-Type": "application/json"}
             response = await client.post(
-                self.config.api_url + '/safety/redteam/benchmark?model_name=gpt-4o &system_prompt=what%20is%20the%20red%20color%20on%20your%20face'
-                )
+                f"{self.config.api_url}/safety/guard/check",
+                json=request_body,
+                headers=headers,
+            )
 
-            print("Response:::", response.status_code)
+            logger.debug("Response:::", response.status_code)
 
         # Check if the response is successful
         if response.status_code != 200:
-            print(f"FiddleCube API error: {response.status_code} - {response.text}")
+            logger.error(f"FiddleCube API error: {response.status_code} - {response.text}")
             raise RuntimeError("Failed to run shield with FiddleCube API")
 
         # Convert the response into the format RunShieldResponse expects
         response_data = response.json()
-        print("Response data", response_data)
-
+        logger.debug("Response data", response_data)
 
         return RunShieldResponse()
