@@ -16,6 +16,7 @@ from llama_stack.apis.safety import (
     RunShieldResponse,
     Safety,
 )
+from llama_stack.apis.safety.safety import SafetyViolation, ViolationLevel
 from llama_stack.apis.shields import Shield
 from llama_stack.providers.datatypes import ShieldsProtocolPrivate
 
@@ -43,11 +44,6 @@ class FiddlecubeSafetyAdapter(Safety, ShieldsProtocolPrivate):
     async def run_shield(
         self, shield_id: str, messages: List[Message], params: Dict[str, Any] = None
     ) -> RunShieldResponse:
-        # Convert the `messages` into the format FiddleCube expects
-        content_messages = [{"text": {"text": message.content}} for message in messages]
-        logger.debug(f"run_shield::final:messages::{json.dumps(content_messages, indent=2)}:")
-
-        # Make a call to the FiddleCube API for guardrails
         async with httpx.AsyncClient(timeout=30.0) as client:
             request_body = {
                 "messages": [message.model_dump(mode="json") for message in messages],
@@ -70,6 +66,27 @@ class FiddlecubeSafetyAdapter(Safety, ShieldsProtocolPrivate):
 
         # Convert the response into the format RunShieldResponse expects
         response_data = response.json()
-        logger.debug("Response data", response_data)
+        logger.debug("Response data: %s", json.dumps(response_data, indent=2))
+
+        # Check if there's a violation based on the response structure
+        if response_data.get("action") == "GUARDRAIL_INTERVENED":
+            user_message = ""
+            metadata = {}
+
+            outputs = response_data.get("outputs", [])
+            if outputs:
+                user_message = outputs[-1].get("text", "Safety violation detected")
+
+            assessments = response_data.get("assessments", [])
+            for assessment in assessments:
+                metadata.update(dict(assessment))
+
+            return RunShieldResponse(
+                violation=SafetyViolation(
+                    user_message=user_message,
+                    violation_level=ViolationLevel.ERROR,
+                    metadata=metadata,
+                )
+            )
 
         return RunShieldResponse()
