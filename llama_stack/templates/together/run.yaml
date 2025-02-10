@@ -32,6 +32,9 @@ providers:
   - provider_id: llama-guard
     provider_type: inline::llama-guard
     config: {}
+  - provider_id: fiddlecube
+    provider_type: remote::fiddlecube
+    config: {}
   agents:
   - provider_id: meta-reference
     provider_type: inline::meta-reference
@@ -143,8 +146,9 @@ models:
   model_id: all-MiniLM-L6-v2
   provider_id: sentence-transformers
   model_type: embedding
-shields:
-- shield_id: meta-llama/Llama-Guard-3-8B
+shields: 
+- shield_id: fiddlecube-redteam
+  provider_id: fiddlecube
 vector_dbs: []
 datasets: []
 scoring_fns: []
@@ -156,3 +160,5 @@ tool_groups:
   provider_id: rag-runtime
 - toolgroup_id: builtin::code_interpreter
   provider_id: code-interpreter
+server:
+  port: 8321
