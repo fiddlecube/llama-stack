@@ -23,7 +23,7 @@ class FiddleCubeRedTeamingAdapter(Eval):
         # in the dict of jobs, set the job_id to the EvaluateResponse
         # return the job
         # refer to llama_stack/providers/inline/eval/meta_reference/eval.py for the implementation of run_eval
-        pass
+        return Job(job_id=len(self.jobs))
 
     async def evaluate_rows(
         self, eval_id: str, input_rows: List[Dict[str, Any]], scoring_functions: List[str], eval_config: EvalTaskConfig
